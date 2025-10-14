@@ -1,11 +1,10 @@
 import argparse
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from pydantic import Field
 from mcp.server.fastmcp import FastMCP
 from glob import glob
 import polars as pl
 import sys
-import traceback
 import os
 
 file_location = os.getenv("FILE_LOCATION", "data/*.csv")
@@ -21,19 +20,9 @@ mcp = FastMCP("analyst", host="0.0.0.0", port=8050, dependencies=["polars"])
     }
 )
 def get_files_list() -> List[str]:
-    files_list = glob(file_location)
-    return files_list
+    return glob(file_location)
 
-def read_file(
-    file_location: str,
-    file_type: str = Field(
-        description="The type of the file to be read. Supported types are csv and parquet",
-        default="csv",
-    ),
-) -> pl.DataFrame:
-    """
-    Read the data from the given file location
-    """
+def read_file(file_location: str, file_type: str = "csv") -> pl.DataFrame:
     if file_type == "csv":
         return pl.read_csv(file_location)
     elif file_type == "parquet":
@@ -41,44 +30,23 @@ def read_file(
     else:
         raise ValueError(f"Unsupported file type: {file_type}")
 
-
-def read_file_list(
-    file_locations: List[str],
-    file_type: str = Field(
-        description="The type of the file to be read. Supported types are csv and parquet",
-        default="csv",
-    ),
-) -> pl.DataFrame:
+def read_file_list(file_locations: List[str], file_type: str = "csv") -> pl.DataFrame:
     """
-    Read the data from the given file locations
+    Lazy read multiple files for performance
     """
     if file_type == "csv":
-        dfs = []
-        for file_location in file_locations:
-            dfs.append(pl.read_csv(file_location))
-        return pl.concat(dfs)
+        dfs = [pl.scan_csv(f) for f in file_locations]  # lazy execution
+        return pl.concat(dfs).collect()  # compute only once
     elif file_type == "parquet":
         dfs = pl.read_parquet(file_locations)
+        return dfs
     else:
         raise ValueError(f"Unsupported file type: {file_type}")
 
-
 @mcp.tool()
-def get_schema(
-    file_location: str,
-    file_type: str = Field(
-        description="The type of the file to be read. Supported types are csv and parquet",
-        default="csv",
-    ),
-) -> List[Dict[str, Any]]:
-    """
-    Get the schema of a single data file from the given file location
-    """
+def get_schema(file_location: str, file_type: str = "csv") -> List[Dict[str, Any]]:
     df = read_file(file_location, file_type)
-
-    schema = df.schema
-    return [{"name": col, "dtype": str(dtype)} for col, dtype in schema.items()]
-
+    return [{"name": col, "dtype": str(dtype)} for col, dtype in df.schema.items()]
 
 polars_sql_aggregate_functions = [
     "avg",
