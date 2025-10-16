@@ -232,7 +232,7 @@ def main():
 
     print("[server] starting…", file=sys.stderr, flush=True)
     mcp.run(
-        transport="sse",
+        transport="streamable-http"
 
     )
 
