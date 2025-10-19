@@ -71,4 +71,4 @@ Initialize Polars SQL context
 
 Expose MCP tools (get_files_list, get_schema, execute_polars_sql)
 
-Start SSE (Server-Sent Events) for agent communication
+Start streamable-http  connection for agent communication
